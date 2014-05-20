@@ -1,0 +1,62 @@
+body {
+  font: 10px sans-serif;
+}
+
+.chord {
+  fill-opacity: .5;
+  stroke-width: 0;
+
+  -webkit-transition: fill-opacity .4s;
+     -moz-transition: fill-opacity .4s;
+       -o-transition: fill-opacity .4s;
+          transition: fill-opacity .4s;
+}
+
+.group path {
+  stroke-width: 0;
+  opacity: .8;
+
+  -webkit-transition: opacity .2s;
+     -moz-transition: opacity .2s;
+       -o-transition: opacity .2s;
+          transition: opacity .2s;
+}
+
+.group text {
+  opacity: .8;
+
+  -webkit-transition: opacity .2s;
+     -moz-transition: opacity .2s;
+       -o-transition: opacity .2s;
+          transition: opacity .2s;
+}
+
+.group .tick {
+  stroke-opacity: .3;
+}
+
+.fade-chords .chord {
+  fill-opacity: .03;
+}
+.fade-groups .group path,
+.fade-groups .group text {
+  opacity: .08;
+}
+
+.chord:hover {
+  fill-opacity: 1;
+  stroke-width: 1;
+}
+.fade-chords .chord.highlighted {
+  fill-opacity: .8;
+}
+
+.group:hover path,
+.group:hover text {
+  stroke-width: 1;
+  opacity: 1;
+}
+.fade-groups .group.highlighted path,
+.fade-groups .group.highlighted text {
+  opacity: .8;
+}
