@@ -6,9 +6,25 @@
     <link rel="stylesheet" type="text/css" href="style.css">
   </head>
   <body>
-    <div id="chart-container"></div>
+    <div class="container" id="chart-container"></div>
+
+    <div class="container" id="controls-container">
+    </div>
+
+    <div class="container" id="info-container">
+      <a class="info url" data-info-key="url" href>
+        <h1 class="info text" data-info-key="name"></h1>
+      </a>
+      <p class="info text" data-info-key="summary"</p>
+      <div class="info" data-info-key="physical_description">
+        <h3 class="appearance-label">Appearance</h3>
+        <p class="text"></p>
+      </div>
+    </div>
+
     <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/lodash.js/2.4.1/lodash.min.js"></script>
     <script src="storm-of-chords.js"></script>
   </body>
 </html>

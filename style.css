@@ -2,6 +2,12 @@ body {
   font: 10px sans-serif;
 }
 
+.container {
+  float: left;
+}
+
+/*** Chord Diagram ***/
+
 .chord {
   fill-opacity: .5;
   stroke-width: 0;
@@ -59,4 +65,17 @@ body {
 .fade-groups .group.highlighted path,
 .fade-groups .group.highlighted text {
   opacity: .8;
+}
+
+/*** Info ***/
+
+#info-container {
+  display: none;
+  width: 400px;
+  margin-top: 100px;
+  font-size: 12px;
+}
+
+#info-container a {
+  text-decoration: none;
 }

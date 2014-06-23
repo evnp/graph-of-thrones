@@ -73,7 +73,7 @@
   var books, chapterMap, characterMap;
 
   // Build initial graph from data file
-  d3.json('asoiaf_data.json', function(data) {
+  d3.json('asoiaf_data_bkp.json', function(data) {
     books = _.sortBy(data.books, 'number');
     characterMap = data.characters;
     chapterMap = {};
@@ -97,6 +97,7 @@
     // Set up list of chapter urls for each character
     _.each(characterMap, function (character, name) {
       character.name = name;
+      character.url = 'abc'; // Temp until urls are part of data
       character.chapterUrls = [];
     });
     _.each(chapterMap, function (chapter, url) {
@@ -109,7 +110,7 @@
   });
 
   function rebuild() {
-    var nameList = _.pluck(getFilteredCharacters(), 'name')
+    var nameList = _.pluck(getFilteredCharacters(), 'name'),
         matrix = generateMatrix(nameList);
     render(matrix, nameList);
   }
@@ -176,6 +177,7 @@
       .attr('class', 'group');
 
     newGroups
+      .attr('data-character', function(d) { return nameList[d.index]; })
       .style('opacity', 0)
       .transition()
       .duration(transitionDuration)
@@ -308,6 +310,36 @@
       });
     }
   }
+
+  /*** Character Info ***/
+
+  $('#chart-container').on('mouseenter', 'svg .group', function () {
+    var $info = $('#info-container'),
+      characterName = $(this).data('character'),
+      characterData = characterMap[characterName];
+
+    if (characterData) {
+      $info.show().find('.info').each(function () {
+        var $el = $(this),
+            key = $el.data('info-key'),
+           data = characterData[key];
+
+        if (!data) { // If no data, don't show the element
+          $el.hide();
+        } else if ($el.hasClass('url')) { // Special case for url data
+          $el.show().attr('href', data);
+        } else if ($el.hasClass('text')) { // If el is text element, set text
+          $el.show().text(data);
+        } else { // Otherwise, see if a child is text element and set text
+          var children = $el.find('.text');
+          if (children.length) { children.text(data); }
+          $el.show();
+        }
+      });
+    } else {
+      $info.hide()
+    }
+  });
 
   /*** Helper Functions ***/
 
