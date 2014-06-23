@@ -9,7 +9,7 @@
   var outerRadius = 800 / 2,
       innerRadius = outerRadius - 130;
 
-  var fill = d3.scale.category20c();
+  var fill = d3.scale.category20b();
 
   var transitionDuration = 500;
 
@@ -99,10 +99,14 @@
       character.name = name;
       character.url = 'abc'; // Temp until urls are part of data
       character.chapterUrls = [];
+      character.povChapterUrls = [];
     });
     _.each(chapterMap, function (chapter, url) {
       _.each(chapter.characterNames, function (name) {
         characterMap[name].chapterUrls.push(url);
+        if (chapter.pov === name) {
+          characterMap[name].povChapterUrls.push(url);
+        }
       });
     });
 
@@ -145,12 +149,17 @@
 
       filteredChapterUrls.each(function(chapterUrl) {
         _.each(chapterMap[chapterUrl].characterNames, function (colName) {
+          var characterIndex = nameToIndexMap[colName];
+
           if (colName != rowName) { // avoid counting the same character with themselves as a pair
-            row[nameToIndexMap[colName]]++;
+            if (characterIndex || characterIndex === 0) {
+              row[characterIndex]++;
+            }
           }
         });
       });
 
+      console.log(row)
       return row;
     });
 
@@ -187,7 +196,9 @@
       .each(function(d) { setColor(this, d.index); });
 
     var newLabels = newGroups.append('text')
-      .text(function(d) { return nameList[d.index]; });
+      .text(function(d) { return nameList[d.index]; })
+      .each(function(d) { setColor(this, d.index); })
+      .style('stroke', null);
 
     groups.select('path')
       .transition()
@@ -258,31 +269,10 @@
       .on('mouseover', null) // Clear out old events
       .on('mouseout', null)
       .on('mouseover', function (d, i) {
-        svg.classed('fade-groups', true);
-        svg.classed('fade-chords', true);
-        d3.select(groupElements[i]).classed('highlighted', true);
-
-        chords.classed('highlighted', function (d) {
-          if (d.source.index === i) {
-            setColor(this, d.target.index);
-            d3.select(groupElements[d.target.index]).classed('highlighted', true);
-            return true;
-
-          } else if (d.target.index === i) {
-            setColor(this, d.source.index);
-            d3.select(groupElements[d.source.index]).classed('highlighted', true);
-            return true;
-          }
-
-          return false;
-        });
+        setCharacterInfo.call(this, d);
+        highlightChordsForGroup(d, i);
       })
-      .on('mouseout', function (d) {
-        svg.classed('fade-groups', false);
-        svg.classed('fade-chords', false);
-        chords.classed('highlighted', false);
-        d3.selectAll(groupElements).classed('highlighted', false);
-      });
+      .on('mouseout', unhighlightAllChords);
 
     chords
       .on('mouseover', null) // Clear out old events
@@ -309,11 +299,100 @@
         };
       });
     }
+
+    function highlightChordsForGroup(d, i) {
+      svg.classed('fade-groups', true);
+      svg.classed('fade-chords', true);
+      d3.select(groupElements[i]).classed('highlighted', true);
+
+      chords.classed('highlighted', function (d) {
+        if (d.source.index === i) {
+          setColor(this, d.target.index);
+          d3.select(groupElements[d.target.index]).classed('highlighted', true);
+          return true;
+
+        } else if (d.target.index === i) {
+          setColor(this, d.source.index);
+          d3.select(groupElements[d.source.index]).classed('highlighted', true);
+          return true;
+        }
+
+        return false;
+      });
+    }
+
+    function unhighlightAllChords(d) {
+      svg.classed('fade-groups', false);
+      svg.classed('fade-chords', false);
+      chords.classed('highlighted', false);
+      d3.selectAll(groupElements).classed('highlighted', false);
+    }
+
+    /*** Character Info ***/
+
+    function setCharacterInfo(d) {
+      console.log(d)
+      console.log(matrix[d.index])
+      var $info = $('#info-container'),
+        characterName = nameList[d.index],
+        characterData = characterMap[characterName],
+        characterColor = $(this).children('path').css('fill'),
+        characterNumChapters =  characterData.chapterUrls.length,
+        characterNumPOVChapters =  characterData.povChapterUrls.length,
+        characterAssociates = _(matrix[d.index])
+          .map(function (numPairings, index) { return { name: nameList[index], numPairings: numPairings }; })
+          .filter('numPairings')
+          .sortBy('numPairings')
+          .reverse() // order desc
+          .value();
+
+      console.log(characterAssociates);
+
+      if (characterData) {
+        $info.find('.info').each(function () {
+          var $el = $(this),
+              key = $el.data('info-key'),
+             data = characterData[key];
+
+          if (!data) { // If no data, don't show the element
+            $el.hide();
+          } else if ($el.hasClass('url')) { // Special case for url data
+            $el.show().attr('href', data);
+          } else if ($el.hasClass('text')) { // If el is text element, set text
+            $el.show().text(data);
+          } else { // Otherwise, see if a child is text element and set text
+            var children = $el.find('.text');
+            if (children.length) { children.text(data); }
+            $el.show();
+          }
+        });
+
+        $info.find('.activity').html(
+          '<h3>Activity</h3>'+
+          '<p>'+ characterNumChapters +' chapters'+
+                (characterNumPOVChapters ? ' ('+ characterNumPOVChapters +' pov)' : '')
+               +', with'+
+          '</p>'+
+          '<ul>'+  _.map(characterAssociates.slice(0, 10), function (associate) {
+            return '<li>'+ associate.name +'</li>';
+          }).join('')+
+          '</ul>'+
+          (characterAssociates.length <= 10 ? '' :
+            '<p>and '+ (characterAssociates.length - 10) + ' others</p>')
+        );
+
+        $info.find('a').css('color', characterColor)
+
+        $info.show();
+      } else {
+        $info.hide();
+      }
+    }
   }
 
   /*** Character Info ***/
 
-  $('#chart-container').on('mouseenter', 'svg .group', function () {
+  /*$('#chart-container').on('mouseenter', 'svg .group', function () {
     var $info = $('#info-container'),
       characterName = $(this).data('character'),
       characterData = characterMap[characterName],
@@ -344,7 +423,7 @@
     } else {
       $info.hide();
     }
-  });
+  });*/
 
   /*** Helper Functions ***/
 
