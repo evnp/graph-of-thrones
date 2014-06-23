@@ -25,103 +25,138 @@
 
   /*** Data Controls ***/
 
-  var $modules = $('#modules'),
-      $months = $('#months'),
-      $years = $('#years'),
-      $includeSolo  = $('#include_solo');
+  // var $modules = $('#modules'),
+  //     $months = $('#months'),
+  //     $years = $('#years'),
+  //     $includeSolo  = $('#include_solo');
 
-  // Set initial states for filters
-  $modules.attr('data-choice-type', 'module')
-    .children('option[value="13"], option[value="14"], option[value="15"]')
-    .prop('selected', true);
-  $months.attr('data-choice-type', 'month');
-  $years.attr('data-choice-type', 'year')
-    .children('option[value="2014"]').prop('selected', true);
+  // // Set initial states for filters
+  // $modules.attr('data-choice-type', 'module')
+  //   .children('option[value="13"], option[value="14"], option[value="15"]')
+  //   .prop('selected', true);
+  // $months.attr('data-choice-type', 'month');
+  // $years.attr('data-choice-type', 'year')
+  //   .children('option[value="2014"]').prop('selected', true);
 
-  // Control value getter functions
-  function getModulesVal() { return ($modules.val() || []).map(parseFloat); }
-  function getMonthsVal() { return ($months.val() || []).map(function (month) { return parseFloat(month) + 1; }); }
-  function getYearsVal() { return ($years.val() || []).map(function (month) { return parseFloat(month) % 100; }); }
-  function getIncludeSoloVal() { return $includeSolo.prop('checked'); }
+  // // Control value getter functions
+  // function getModulesVal() { return ($modules.val() || []).map(parseFloat); }
+  // function getMonthsVal() { return ($months.val() || []).map(function (month) { return parseFloat(month) + 1; }); }
+  // function getYearsVal() { return ($years.val() || []).map(function (month) { return parseFloat(month) % 100; }); }
+  // function getIncludeSoloVal() { return $includeSolo.prop('checked'); }
 
-  // Variables representing the current state of filters
-  var modules     = getModulesVal(),
-      months      = getMonthsVal(),
-      years       = getYearsVal(),
-      includeSolo = getIncludeSoloVal();
+  // // Variables representing the current state of filters
+  // var modules     = getModulesVal(),
+  //     months      = getMonthsVal(),
+  //     years       = getYearsVal(),
+  //     includeSolo = getIncludeSoloVal();
 
-  // When control changes, update corresponding filter state and rebuild graph
-  $modules.change(function () {
-    modules = getModulesVal();
-    filterAndRebuild(modules, includeSolo);
-  });
-  $months.change(function () {
-    months = getMonthsVal();
-    filterAndRebuild();
-  })
-  $years.change(function () {
-    years = getYearsVal();
-    filterAndRebuild();
-  })
-  $includeSolo.change(function () {
-    includeSolo = getIncludeSoloVal();
-    filterAndRebuild();
-  });
+  // // When control changes, update corresponding filter state and rebuild graph
+  // $modules.change(function () {
+  //   modules = getModulesVal();
+  //   rebuild();
+  // });
+  // $months.change(function () {
+  //   months = getMonthsVal();
+  //   rebuild();
+  // })
+  // $years.change(function () {
+  //   years = getYearsVal();
+  //   rebuild();
+  // })
+  // $includeSolo.change(function () {
+  //   includeSolo = getIncludeSoloVal();
+  //   rebuild();
+  // });
 
-  function filterscene(scene, characterId) {
-    return modules.indexOf(scene.module) !== -1
-       && (months.length === 0 || months.indexOf(parseFloat(scene.date.slice(0, 2))) !== -1)
-       && (years.length === 0 || years.indexOf(parseFloat(scene.date.slice(-2))) !== -1)
-       && (includeSolo || parseFloat(characterId) !== parseFloat(scene.partner));
-  }
+  var includeAppearances = true, includeActive = true, minAppearances = 5;
+
+  var books, chapterMap, characterMap;
 
   // Build initial graph from data file
-  var sceneMap, characterMap;
-  d3.json('character_data.json', function(data) {
-    sceneMap = data.scene_data;
-    characterMap = data.character_data;
-    filterAndRebuild();
+  d3.json('asoiaf_data.json', function(data) {
+    books = _.sortBy(data.books, 'number');
+    characterMap = data.characters;
+    chapterMap = {};
+
+    // Set up map of chapters keyed on chapter url
+    _.each(books, function (book) {
+      _.each(book.chapters, function (chapter) {
+        chapter.book = book.number;
+        chapterMap[chapter.url] = chapter;
+      });
+    });
+
+    // Set up list of character names for each chapter
+    _.each(chapterMap, function (chapter) {
+      chapter.characterNames = _.union(
+        includeAppearances ? chapter.appearances : [],
+        includeActive      ? chapter.active      : []
+      );
+    });
+
+    // Set up list of chapter urls for each character
+    _.each(characterMap, function (character, name) {
+      character.name = name;
+      character.chapterUrls = [];
+    });
+    _.each(chapterMap, function (chapter, url) {
+      _.each(chapter.characterNames, function (name) {
+        characterMap[name].chapterUrls.push(url);
+      });
+    });
+
+    rebuild();
   });
 
-  // Filter scenes against the current filter state and rebuild the graph
-  function filterAndRebuild() {
+  function rebuild() {
+    var nameList = _.pluck(getFilteredCharacters(), 'name')
+        matrix = generateMatrix(nameList);
+    render(matrix, nameList);
+  }
 
-    // Store characters in array and create map of ids -> indices
-    // - filter out characters that don't have scenes passing filterscene
-    var characters = [], idToIndexMap = {};
-    _.each(characterMap, function(character, id) {
-      if (_.any(sceneMap[id], function (scene) { return filterscene(scene, id); })) {
-        character.id = id;
-        characters.push(character)
-        idToIndexMap[id] = characters.length - 1;
-      }
+  function chapterFilter(chapterUrl) {
+    var chapter = chapterMap[chapterUrl];
+    return true;
+    //return modules.indexOf(chapter.module) !== -1
+    //   && (months.length === 0 || months.indexOf(parseFloat(chapter.date.slice(0, 2))) !== -1)
+    //   && (years.length === 0 || years.indexOf(parseFloat(chapter.date.slice(-2))) !== -1);
+  }
+
+  // Return an array of characters that appear in chapters passing chapterFilter
+  function getFilteredCharacters() {
+    return _.filter(characterMap, function (character) {
+      return _.any(character.chapterUrls, chapterFilter) &&
+             character.chapterUrls.length >= minAppearances;
     });
+  }
 
-    console.log(characters)
+  // Construct a square matrix containing counts of character pairings
+  function generateMatrix(characterNameList) {
+    var nameToIndexMap = getKeyToIndexMap(characterNameList),
+        filteredChapters =
+        size = characterNameList.length;
 
-    // Construct a square matrix counting scene partnerships.
-    var matrix = [];
-    _.each(characters, function(character) {
-      var row = [];
-      for (var j = 0; j < characters.length; j++) { row.push(0); }
+    var matrix = _.map(characterNameList, function(rowName) {
 
-      _.each(sceneMap[character.id], function(scene) {
-        if (filterscene(scene, character.id)) {
-          row[idToIndexMap[scene.partner]]++;
-        }
+      // create a row prefilled with zeroes
+      var row = []; for (var j = 0; j < size; j++) { row.push(0); }
+      var filteredChapterUrls = _(characterMap[rowName].chapterUrls).filter(chapterFilter);
+
+      filteredChapterUrls.each(function(chapterUrl) {
+        _.each(chapterMap[chapterUrl].characterNames, function (colName) {
+          if (colName != rowName) { // avoid counting the same character with themselves as a pair
+            row[nameToIndexMap[colName]]++;
+          }
+        });
       });
 
-      matrix.push(row);
+      return row;
     });
 
-    console.log(matrix);
+    return matrix;
+  }
 
-    function setColor(el, n) {
-      d3.select(el)
-        .style('stroke', d3.rgb(fill(n)).darker())
-        .style('fill', fill(n));
-    }
-
+  function render(matrix, nameList) {
     var chord = d3.layout.chord()
       .sortSubgroups(d3.descending)
       .sortChords(d3.descending);
@@ -150,7 +185,7 @@
       .each(function(d) { setColor(this, d.index); });
 
     var newLabels = newGroups.append('text')
-      .text(function(d) { return characters[d.index].name; });
+      .text(function(d) { return nameList[d.index]; });
 
     groups.select('path')
       .transition()
@@ -265,13 +300,27 @@
     // Returns an array of tick angles and labels, given a group.
     function groupTicks(d) {
       var k = (d.endAngle - d.startAngle) / d.value;
-      return d3.range(0, d.value, 1).map(function(v, i) {
+      return d3.range(0, d.value, 10).map(function(v, i) {
         return {
           angle: v * k + d.startAngle,
           label: i % 5 ? null : v / 1000 + "k"
         };
       });
     }
+  }
+
+  /*** Helper Functions ***/
+
+  function setColor(el, n) {
+    d3.select(el)
+      .style('stroke', d3.rgb(fill(n)).darker())
+      .style('fill', fill(n));
+  }
+
+  function getKeyToIndexMap(keyArray) {
+    var i = 0, map = {};
+    _.each(keyArray, function (key) { map[key] = i++; });
+    return map;
   }
 
 }(jQuery, _, d3));
