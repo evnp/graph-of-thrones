@@ -68,12 +68,12 @@
   //   rebuild();
   // });
 
-  var includeAppearances = true, includeActive = true, minAppearances = 5;
+  var includeAppearances = true, includeActive = true, minAppearances = 15;
 
   var books, chapterMap, characterMap;
 
   // Build initial graph from data file
-  d3.json('asoiaf_data_bkp.json', function(data) {
+  d3.json('asoiaf_data.json', function(data) {
     books = _.sortBy(data.books, 'number');
     characterMap = data.characters;
     chapterMap = {};
