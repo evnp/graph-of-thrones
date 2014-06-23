@@ -316,10 +316,11 @@
   $('#chart-container').on('mouseenter', 'svg .group', function () {
     var $info = $('#info-container'),
       characterName = $(this).data('character'),
-      characterData = characterMap[characterName];
+      characterData = characterMap[characterName],
+      characterColor = $(this).children('path').css('fill');
 
     if (characterData) {
-      $info.show().find('.info').each(function () {
+      $info.find('.info').each(function () {
         var $el = $(this),
             key = $el.data('info-key'),
            data = characterData[key];
@@ -336,8 +337,12 @@
           $el.show();
         }
       });
+
+      $info.find('a').css('color', characterColor)
+
+      $info.show();
     } else {
-      $info.hide()
+      $info.hide();
     }
   });
 
