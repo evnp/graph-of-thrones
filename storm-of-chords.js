@@ -141,7 +141,8 @@
   function generateMatrix(characterNameList) {
     var nameToIndexMap = getKeyToIndexMap(characterNameList),
         filteredChapters =
-        size = characterNameList.length;
+        size = characterNameList.length,
+        chapterValues = {};
 
     var matrix = _.map(characterNameList, function(rowName) {
 
@@ -150,12 +151,24 @@
       var filteredChapterUrls = _(characterMap[rowName].chapterUrls).filter(chapterFilter);
 
       filteredChapterUrls.each(function(chapterUrl) {
-        _.each(chapterMap[chapterUrl].characterNames, function (colName) {
+        var characterNames = chapterMap[chapterUrl].characterNames,
+            chapterValue = chapterValues[chapterUrl];
+
+        if (!chapterValue) {
+          var chapterCast = _.filter(characterNames, function (name) {
+            return characterNameList.indexOf(name) !== -1;
+          });
+
+          chapterValue = 1.5 * (1 / chapterCast.length);
+          chapterValues[chapterUrl] = chapterValue;
+        }
+
+        _.each(characterNames, function (colName) {
           var characterIndex = nameToIndexMap[colName];
 
           if (colName != rowName) { // avoid counting the same character with themselves as a pair
             if (characterIndex || characterIndex === 0) {
-              row[characterIndex]++;
+              row[characterIndex] += chapterValue;
             }
           }
         });
@@ -309,7 +322,7 @@
     // Returns an array of tick angles and labels, given a group.
     function groupTicks(d) {
       var k = (d.endAngle - d.startAngle) / d.value;
-      return d3.range(0, d.value, 10).map(function(v, i) {
+      return d3.range(0, d.value, 5).map(function(v, i) {
         return {
           angle: v * k + d.startAngle,
           label: i % 5 ? null : v / 1000 + "k"
