@@ -277,6 +277,8 @@
       .on('mouseover', null) // Clear out old events
       .on('mouseout', null)
       .on('mouseover', function (d) {
+        mixpanel.track('Character viewed.');
+
         setCharacterInfo.call(this, d);
         highlightChordsForGroup(d);
       })
@@ -372,7 +374,7 @@
             key = $el.data('info-key'),
           value = charData[key];
 
-        if (!charData) { // If no data, don't show the element
+        if (!value) { // If no value, don't show the element
           $el.hide();
         } else if ($el.hasClass('url')) { // Special case for url data
           $el.show().attr('href', value);
@@ -408,7 +410,7 @@
     var $activity = $('#info-container .activity');
 
     $activity.off('mouseenter');
-    $activity.on('mouseenter', 'li', function () {
+    $activity.on('mouseenter', 'li a', function () {
       var charName = $(this).text(),
           charData = characterMap[charName],
          groupData = charData.groupData;
@@ -417,7 +419,7 @@
     });
 
     $activity.off('mouseout');
-    $activity.on('mouseout', 'li', unhighlightAllChords);
+    $activity.on('mouseout', 'li a', unhighlightAllChords);
   }
 
 
