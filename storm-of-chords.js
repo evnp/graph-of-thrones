@@ -9,7 +9,7 @@
   var outerRadius = 800 / 2,
       innerRadius = outerRadius - 130;
 
-  var fill = d3.scale.category20b();
+  var colors = d3.scale.category20b();
 
   var transitionDuration = 500;
 
@@ -103,9 +103,11 @@
     });
     _.each(chapterMap, function (chapter, url) {
       _.each(chapter.characterNames, function (name) {
-        characterMap[name].chapterUrls.push(url);
+        var character = characterMap[name];
+
+        character.chapterUrls.push(url);
         if (chapter.pov === name) {
-          characterMap[name].povChapterUrls.push(url);
+          character.povChapterUrls.push(url);
         }
       });
     });
@@ -159,7 +161,6 @@
         });
       });
 
-      console.log(row)
       return row;
     });
 
@@ -167,6 +168,13 @@
   }
 
   function render(matrix, nameList) {
+
+    // Set character colors
+    colors.domain(0, nameList.length);
+    _.each(nameList, function (name, i) {
+      characterMap[name].color = colors(i);
+    });
+
     var chord = d3.layout.chord()
       .sortSubgroups(d3.descending)
       .sortChords(d3.descending);
@@ -186,19 +194,19 @@
       .attr('class', 'group');
 
     newGroups
-      .attr('data-character', function(d) { return nameList[d.index]; })
+      .attr('data-character', function (d) { return nameList[d.index]; })
+      .each(function (d) { characterMap[nameList[d.index]].groupData = d; })
       .style('opacity', 0)
       .transition()
       .duration(transitionDuration)
         .style('opacity', 1);
 
     var newArcs = newGroups.append('path')
-      .each(function(d) { setColor(this, d.index); });
+      .each(setColor);
 
     var newLabels = newGroups.append('text')
-      .text(function(d) { return nameList[d.index]; })
-      .each(function(d) { setColor(this, d.index); })
-      .style('stroke', null);
+      .text(function (d) { return nameList[d.index]; })
+      .style('fill', function (d) { return d3.rgb(characterMap[nameList[d.index]].color).darker(); })
 
     groups.select('path')
       .transition()
@@ -250,7 +258,7 @@
 
     var newChords = chords.enter().append('path')
       .attr('class', 'chord')
-      .each(function(d) { setColor(this, d.source.index); })
+      .each(function(d) { setColor.call(this, d.source); })
       .style('opacity', 0);
 
     chords
@@ -268,9 +276,9 @@
     groups
       .on('mouseover', null) // Clear out old events
       .on('mouseout', null)
-      .on('mouseover', function (d, i) {
+      .on('mouseover', function (d) {
         setCharacterInfo.call(this, d);
-        highlightChordsForGroup(d, i);
+        highlightChordsForGroup(d);
       })
       .on('mouseout', unhighlightAllChords);
 
@@ -289,6 +297,13 @@
         d3.select(groupElements[d.target.index]).classed('highlighted', false);
       });
 
+    function setColor(d) {
+      var color = characterMap[nameList[d.index]].color;
+      d3.select(this)
+        .style('stroke', d3.rgb(color).darker())
+        .style('fill', color);
+    }
+
     // Returns an array of tick angles and labels, given a group.
     function groupTicks(d) {
       var k = (d.endAngle - d.startAngle) / d.value;
@@ -300,19 +315,21 @@
       });
     }
 
-    function highlightChordsForGroup(d, i) {
+    function highlightChordsForGroup(d) {
+      var groupIndex = d.index;
+
       svg.classed('fade-groups', true);
       svg.classed('fade-chords', true);
-      d3.select(groupElements[i]).classed('highlighted', true);
+      d3.select(groupElements[groupIndex]).classed('highlighted', true);
 
       chords.classed('highlighted', function (d) {
-        if (d.source.index === i) {
-          setColor(this, d.target.index);
+        if (d.source.index === groupIndex) {
+          setColor.call(this, d.target);
           d3.select(groupElements[d.target.index]).classed('highlighted', true);
           return true;
 
-        } else if (d.target.index === i) {
-          setColor(this, d.source.index);
+        } else if (d.target.index === groupIndex) {
+          setColor.call(this, d.source);
           d3.select(groupElements[d.source.index]).classed('highlighted', true);
           return true;
         }
@@ -321,7 +338,7 @@
       });
     }
 
-    function unhighlightAllChords(d) {
+    function unhighlightAllChords() {
       svg.classed('fade-groups', false);
       svg.classed('fade-chords', false);
       chords.classed('highlighted', false);
@@ -331,107 +348,80 @@
     /*** Character Info ***/
 
     function setCharacterInfo(d) {
-      console.log(d)
-      console.log(matrix[d.index])
       var $info = $('#info-container'),
-        characterName = nameList[d.index],
-        characterData = characterMap[characterName],
-        characterColor = $(this).children('path').css('fill'),
-        characterNumChapters =  characterData.chapterUrls.length,
-        characterNumPOVChapters =  characterData.povChapterUrls.length,
-        characterAssociates = _(matrix[d.index])
-          .map(function (numPairings, index) { return { name: nameList[index], numPairings: numPairings }; })
+        charName    = nameList[d.index],
+        charData    = characterMap[charName],
+        color       = $(this).children('path').css('fill'),
+        numChapters = charData.chapterUrls.length,
+        numPov      = charData.povChapterUrls.length,
+        associates  = _(matrix[d.index])
+          .map(function (numPairings, index) {
+            return {
+              character: characterMap[nameList[index]],
+              numPairings: numPairings
+            };
+          })
           .filter('numPairings')
           .sortBy('numPairings')
           .reverse() // order desc
+          .pluck('character')
           .value();
 
-      console.log(characterAssociates);
-
-      if (characterData) {
-        $info.find('.info').each(function () {
-          var $el = $(this),
-              key = $el.data('info-key'),
-             data = characterData[key];
-
-          if (!data) { // If no data, don't show the element
-            $el.hide();
-          } else if ($el.hasClass('url')) { // Special case for url data
-            $el.show().attr('href', data);
-          } else if ($el.hasClass('text')) { // If el is text element, set text
-            $el.show().text(data);
-          } else { // Otherwise, see if a child is text element and set text
-            var children = $el.find('.text');
-            if (children.length) { children.text(data); }
-            $el.show();
-          }
-        });
-
-        $info.find('.activity').html(
-          '<h3>Activity</h3>'+
-          '<p>'+ characterNumChapters +' chapters'+
-                (characterNumPOVChapters ? ' ('+ characterNumPOVChapters +' pov)' : '')
-               +', with'+
-          '</p>'+
-          '<ul>'+  _.map(characterAssociates.slice(0, 10), function (associate) {
-            return '<li>'+ associate.name +'</li>';
-          }).join('')+
-          '</ul>'+
-          (characterAssociates.length <= 10 ? '' :
-            '<p>and '+ (characterAssociates.length - 10) + ' others</p>')
-        );
-
-        $info.find('a').css('color', characterColor)
-
-        $info.show();
-      } else {
-        $info.hide();
-      }
-    }
-  }
-
-  /*** Character Info ***/
-
-  /*$('#chart-container').on('mouseenter', 'svg .group', function () {
-    var $info = $('#info-container'),
-      characterName = $(this).data('character'),
-      characterData = characterMap[characterName],
-      characterColor = $(this).children('path').css('fill');
-
-    if (characterData) {
       $info.find('.info').each(function () {
         var $el = $(this),
             key = $el.data('info-key'),
-           data = characterData[key];
+          value = charData[key];
 
-        if (!data) { // If no data, don't show the element
+        if (!charData) { // If no data, don't show the element
           $el.hide();
         } else if ($el.hasClass('url')) { // Special case for url data
-          $el.show().attr('href', data);
+          $el.show().attr('href', value);
         } else if ($el.hasClass('text')) { // If el is text element, set text
-          $el.show().text(data);
+          $el.show().text(value);
         } else { // Otherwise, see if a child is text element and set text
           var children = $el.find('.text');
-          if (children.length) { children.text(data); }
+          if (children.length) { children.text(value); }
           $el.show();
         }
       });
 
-      $info.find('a').css('color', characterColor)
+      $info.find('a').css('color', color);
+
+      $info.find('.activity').html(
+        '<h3>Activity</h3>'+
+        '<p>'+ numChapters +' chapters'+
+              (numPov ? ' ('+ numPov +' pov)' : '')
+             +', with'+
+        '</p>'+
+        '<ul>'+  _.map(associates.slice(0, 10), function (associate) {
+          return '<li><a style="color: '+ d3.rgb(associate.color).darker() +'" href="'+ associate.url +'">'+ associate.name +'</a></li>';
+        }).join('')+
+        '</ul>'+
+        (associates.length <= 10 ? '' : '<p>and '+ (associates.length - 10) + ' others</p>')
+      );
 
       $info.show();
-    } else {
-      $info.hide();
     }
-  });*/
+
+    /*** Character Info Activity List ***/
+
+    var $activity = $('#info-container .activity');
+
+    $activity.off('mouseenter');
+    $activity.on('mouseenter', 'li', function () {
+      var charName = $(this).text(),
+          charData = characterMap[charName],
+         groupData = charData.groupData;
+
+      highlightChordsForGroup(groupData);
+    });
+
+    $activity.off('mouseout');
+    $activity.on('mouseout', 'li', unhighlightAllChords);
+  }
+
 
   /*** Helper Functions ***/
-
-  function setColor(el, n) {
-    d3.select(el)
-      .style('stroke', d3.rgb(fill(n)).darker())
-      .style('fill', fill(n));
-  }
 
   function getKeyToIndexMap(keyArray) {
     var i = 0, map = {};
