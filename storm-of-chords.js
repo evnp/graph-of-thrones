@@ -1,27 +1,7 @@
 (function ($, _, d3) {
 
-  d3.selection.prototype.moveToFront = function() {
-    return this.each(function(){
-    this.parentNode.appendChild(this);
-    });
-  };
-
-  var outerRadius = 800 / 2,
-      innerRadius = outerRadius - 130;
-
-  var colors = d3.scale.category20b();
-
-  var transitionDuration = 500;
-
-  var arc = d3.svg.arc()
-      .innerRadius(innerRadius)
-      .outerRadius(innerRadius + 20);
-
-  var svg = d3.select('#chart-container').append('svg')
-      .attr('width', outerRadius * 2)
-      .attr('height', outerRadius * 2)
-    .append('g')
-      .attr('transform', 'translate(' + outerRadius + ',' + outerRadius + ')');
+  // Initialize Diagram
+  var chordDiagram = ChordDiagram($('#chart-container').get());
 
   /*** Data Controls ***/
 
@@ -116,9 +96,9 @@
   });
 
   function rebuild() {
-    var nameList = _.pluck(getFilteredCharacters(), 'name'),
-        matrix = generateMatrix(nameList);
-    render(matrix, nameList);
+    var nameArray = _.pluck(getFilteredCharacters(), 'name'),
+        matrix = generateMatrix(nameArray);
+    render(matrix, nameArray);
   }
 
   function chapterFilter(chapterUrl) {
@@ -182,183 +162,14 @@
 
   function render(matrix, nameList) {
 
-    // Set character colors
-    colors.domain(0, nameList.length);
-    _.each(nameList, function (name, i) {
-      characterMap[name].color = colors(i);
-    });
+    var newSelections = chordDiagram.render(matrix, nameList),
+        newArcs   = newSelections.newArcs,
+        newChords = newSelections.newChords;
 
-    var chord = d3.layout.chord()
-      .sortSubgroups(d3.descending)
-      .sortChords(d3.descending);
-
-    chord.matrix(matrix);
-
-    var groups = svg.selectAll('.group').data(chord.groups);
-
-    groups.exit()
-      .style('opacity', 1)
-      .transition()
-      .duration(transitionDuration)
-        .style('opacity', 0)
-      .remove();
-
-    var newGroups = groups.enter().append('g')
-      .attr('class', 'group');
-
-    newGroups
+    newArcs
+      .on('mouseenter', setCharacterInfo)
       .attr('data-character', function (d) { return nameList[d.index]; })
-      .each(function (d) { characterMap[nameList[d.index]].groupData = d; })
-      .style('opacity', 0)
-      .transition()
-      .duration(transitionDuration)
-        .style('opacity', 1);
-
-    var newArcs = newGroups.append('path')
-      .each(setColor);
-
-    var newLabels = newGroups.append('text')
-      .text(function (d) { return nameList[d.index]; })
-      .style('fill', function (d) { return d3.rgb(characterMap[nameList[d.index]].color).darker(); })
-
-    groups.select('path')
-      .transition()
-      .duration(transitionDuration)
-        .attr('d', arc);
-
-    groups.select('text')
-      .transition()
-      .duration(transitionDuration)
-        .each(function(d) { d.angle = (d.startAngle + d.endAngle) / 2; })
-        .attr('dy', '.35em')
-        .attr('transform', function(d) {
-          return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
-              + 'translate(' + (innerRadius + 26) + ')'
-              + (d.angle > Math.PI ? 'rotate(180)' : '');
-        })
-        .style('text-anchor', function(d) { return d.angle > Math.PI ? 'end' : null; })
-
-    // Reset ticks
-    groups.selectAll('.tick').remove();
-    groups.append("g").selectAll("g")
-        .data(groupTicks)
-      .enter().append("g")
-        .attr('class', 'tick')
-        .attr("transform", function(d) {
-          return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")"
-              + "translate(" + innerRadius + ",0)";
-        })
-        .append("line")
-          .attr("x1", 6)
-          .attr("y1", 0)
-          .attr("x2", 13)
-          .attr("y2", 0)
-          .style("stroke", "#fff")
-          .style('opacity', 0)
-          .transition()
-          .delay(transitionDuration)
-          .duration(400)
-            .style('opacity', 1);
-
-    var chords = svg.selectAll('.chord').data(chord.chords);
-
-    chords.exit()
-      .style('opacity', 1)
-      .transition()
-      .duration(transitionDuration)
-        .style('opacity', 0)
-      .remove();
-
-    var newChords = chords.enter().append('path')
-      .attr('class', 'chord')
-      .each(function(d) { setColor.call(this, d.source); })
-      .style('opacity', 0);
-
-    chords
-      .transition()
-      .duration(transitionDuration)
-        .style('opacity', 1)
-        .attr('d', d3.svg.chord().radius(innerRadius));
-
-    /*** Chord and Arc Events  ***/
-
-    // Collect group elements so they can be referenced via chords
-    var groupElements = [];
-    groups.each(function (d, i) { groupElements[i] = this; });
-
-    groups
-      .on('mouseover', null) // Clear out old events
-      .on('mouseout', null)
-      .on('mouseover', function (d) {
-        mixpanel.track('Character viewed.');
-
-        setCharacterInfo.call(this, d);
-        highlightChordsForGroup(d);
-      })
-      .on('mouseout', unhighlightAllChords);
-
-    chords
-      .on('mouseover', null) // Clear out old events
-      .on('mouseout', null)
-      .on('mouseover', function (d) {
-        svg.classed('fade-groups', true);
-        d3.select(groupElements[d.source.index]).classed('highlighted', true);
-        d3.select(groupElements[d.target.index]).classed('highlighted', true);
-        d3.select(this).moveToFront();
-      })
-      .on('mouseout', function (d) {
-        svg.classed('fade-groups', false);
-        d3.select(groupElements[d.source.index]).classed('highlighted', false);
-        d3.select(groupElements[d.target.index]).classed('highlighted', false);
-      });
-
-    function setColor(d) {
-      var color = characterMap[nameList[d.index]].color;
-      d3.select(this)
-        .style('stroke', d3.rgb(color).darker())
-        .style('fill', color);
-    }
-
-    // Returns an array of tick angles and labels, given a group.
-    function groupTicks(d) {
-      var k = (d.endAngle - d.startAngle) / d.value;
-      return d3.range(0, d.value, 5).map(function(v, i) {
-        return {
-          angle: v * k + d.startAngle,
-          label: i % 5 ? null : v / 1000 + "k"
-        };
-      });
-    }
-
-    function highlightChordsForGroup(d) {
-      var groupIndex = d.index;
-
-      svg.classed('fade-groups', true);
-      svg.classed('fade-chords', true);
-      d3.select(groupElements[groupIndex]).classed('highlighted', true);
-
-      chords.classed('highlighted', function (d) {
-        if (d.source.index === groupIndex) {
-          setColor.call(this, d.target);
-          d3.select(groupElements[d.target.index]).classed('highlighted', true);
-          return true;
-
-        } else if (d.target.index === groupIndex) {
-          setColor.call(this, d.source);
-          d3.select(groupElements[d.source.index]).classed('highlighted', true);
-          return true;
-        }
-
-        return false;
-      });
-    }
-
-    function unhighlightAllChords() {
-      svg.classed('fade-groups', false);
-      svg.classed('fade-chords', false);
-      chords.classed('highlighted', false);
-      d3.selectAll(groupElements).classed('highlighted', false);
-    }
+      .each(function (d) { characterMap[nameList[d.index]].arc = d; })
 
     /*** Character Info ***/
 
@@ -418,22 +229,22 @@
       $info.show();
     }
 
-    /*** Character Info Activity List ***/
-
-    var $activity = $('#info-container .activity');
-
-    $activity.off('mouseenter');
-    $activity.on('mouseenter', 'li a', function () {
-      var charName = $(this).text(),
-          charData = characterMap[charName],
-         groupData = charData.groupData;
-
-      highlightChordsForGroup(groupData);
-    });
-
-    $activity.off('mouseout');
-    $activity.on('mouseout', 'li a', unhighlightAllChords);
   }
+
+
+  /*** Character Info Activity List ***/
+
+  var $activity = $('#info-container .activity');
+
+  $activity.off('mouseenter');
+  $activity.on('mouseenter', 'li a', function () {
+    chordDiagram.highlightChordsForArc(characterMap[charName].arc);
+  });
+
+  $activity.off('mouseout');
+  $activity.on('mouseout', 'li a', function () {
+    chordDiagram.unhighlightAll();
+  });
 
 
   /*** Helper Functions ***/
