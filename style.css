@@ -1,9 +1,17 @@
 body {
   font: 10px sans-serif;
+  padding-top: 100px;
+  padding-left: 20px;
+  padding-bottom: 20px;
 }
 
 .container {
   float: left;
+}
+
+#chart-container {
+  margin-top: -100px;
+  margin-left: -20px;
 }
 
 /*** Chord Diagram ***/
@@ -70,17 +78,31 @@ body {
 /*** Info ***/
 
 #info-container {
-  display: none;
   width: 400px;
-  margin-top: 100px;
+  margin-right: 20px;
+  margin-bottom: 40px;
   font-size: 12px;
   line-height: 18px;
 }
 #info-container a {
   text-decoration: none;
 }
+#info-container i {
+  white-space: nowrap;
+}
 #info-container ul {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+#info-container .appearance {
+  display: none;
+}
+
+/*** Controls ***/
+
+#controls-container {
+  font-size: 12px;
+  margin-top: 40px;
+  margin-bottom: 40px;
 }
