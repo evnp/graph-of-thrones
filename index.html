@@ -13,19 +13,29 @@ mixpanel.init("f5d9a82765012a1c671d34b38f87d0a2");</script><!-- end Mixpanel -->
   <body>
     <div class="container" id="chart-container"></div>
 
-    <div class="container" id="controls-container">
-    </div>
-
     <div class="container" id="info-container">
       <a class="info url" data-info-key="url" href>
-        <h1 class="info text" data-info-key="name"></h1>
+        <h1 class="info text" data-info-key="name">Graph of Thrones</h1>
       </a>
-      <p class="info text" data-info-key="summary"</p>
-      <div class="info" data-info-key="physical_description">
+      <p class="info text" data-info-key="summary">
+        A visualization of relationships between characters in the book series <i>A Song of Ice and Fire</i> by George R. R. Martin. Built with D3.js.
+      </p>
+      <div class="info appearance" data-info-key="physical_description">
         <h3 class="appearance-label">Appearance</h3>
         <p class="text"></p>
       </div>
       <div class="activity">
+      </div>
+    </div>
+
+    <div class="container" id="controls-container">
+      <div class="books">
+        <p>Books</p>
+        <p><input class="book-checkbox" type="checkbox" name="All" value="all" checked> All</p>
+      </div>
+      <div class="min-appearances">
+        <p>Minimum Number of Appearances</p>
+        <select></select>
       </div>
     </div>
 

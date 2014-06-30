@@ -48,22 +48,84 @@
   //   rebuild();
   // });
 
-  var includeAppearances = true, includeActive = true, minAppearances = 15;
 
-  var books, chapterMap, characterMap;
+  var includeAppearances = true,
+      includeActive = true,
+      minAppearances = 15;
+
+  var books, chapterMap, characterMap,
+      selectedChapterUrls = [];
+
+  var $info = $('#info-container'),
+    $controls = $('#controls-container'),
+    $booksControl = $controls.children('.books'),
+    $appearancesControl = $controls.find('.min-appearances');
+
+
+  // Set up books control
+
+  $booksControl.on('change', 'input', function () {
+    var $input = $(this), $inputs = $controls.find('.book-checkbox');
+
+    if ($input.val() === 'all') {
+      $inputs.prop('checked', $input.prop('checked'));
+    } else if (!$input.prop('checked')){
+      $inputs.filter('[value="all"]').prop('checked', false);
+    }
+
+    var selectedBookNumbers = $.map($inputs.filter(function () {
+      var $input = $(this);
+      return $input.val() !== 'all' && $input.prop('checked');
+    }), function (el) {
+      return parseFloat($(el).val());
+    });
+
+    selectedChapterUrls = _(chapterMap)
+      .filter(function (chapter) { return selectedBookNumbers.indexOf(chapter.book) !== -1; })
+      .pluck('url')
+      .value();
+
+    rebuild();
+  });
+
+
+  // Set up min-appearances control
+
+  var $appearancesSelect = $appearancesControl.children('select');
+  $appearancesSelect.html(_.map(Array(50), function (el, i) {
+    return '<option value="'+ i +'">'+ i +'</option>';
+  }).join(''));
+  $appearancesSelect.val(minAppearances)
+  $appearancesSelect.change(function () {
+    minAppearances = parseFloat($(this).val());
+    rebuild();
+  });
+
 
   // Build initial graph from data file
+
   d3.json('asoiaf_data.json', function(data) {
-    books = _.sortBy(data.books, 'number');
+    books = selectedBooks = _.sortBy(data.books, 'number');
     characterMap = data.characters;
     chapterMap = {};
 
     // Set up map of chapters keyed on chapter url
-    _.each(books, function (book) {
+    _.each(books, function (book, i) {
       _.each(book.chapters, function (chapter) {
         chapter.book = book.number;
         chapterMap[chapter.url] = chapter;
+        selectedChapterUrls.push(chapter.url);
       });
+
+      $('<p/>', {
+        text: ' ' + book.title
+      }).prepend($('<input/>', {
+        class: 'book-checkbox',
+        type: 'checkbox',
+        name: book.title,
+        value: i + 1,
+        checked: true
+      })).appendTo($controls.children('.books'));
     });
 
     // Set up list of character names for each chapter
@@ -96,26 +158,18 @@
   });
 
   function rebuild() {
-    var names = _.pluck(getFilteredCharacters(), 'name'),
-        pairings = countPairings(names);
+    var names = _(characterMap).filter(characterFilter).pluck('name').value(),
+      pairings = countPairings(names);
 
     render(pairings, names);
   }
 
   function chapterFilter(chapterUrl) {
-    var chapter = chapterMap[chapterUrl];
-    return true;
-    //return modules.indexOf(chapter.module) !== -1
-    //   && (months.length === 0 || months.indexOf(parseFloat(chapter.date.slice(0, 2))) !== -1)
-    //   && (years.length === 0 || years.indexOf(parseFloat(chapter.date.slice(-2))) !== -1);
+    return selectedChapterUrls.indexOf(chapterUrl) !== -1;
   }
 
-  // Return an array of characters that appear in chapters passing chapterFilter
-  function getFilteredCharacters() {
-    return _.filter(characterMap, function (character) {
-      return _.any(character.chapterUrls, chapterFilter) &&
-             character.chapterUrls.length >= minAppearances;
-    });
+  function characterFilter(character) {
+    return _.filter(character.chapterUrls, chapterFilter).length >= minAppearances;
   }
 
   // Construct a square matrix containing counts of character pairings
@@ -185,8 +239,8 @@
     var charName  = names[arc.index],
       charData    = characterMap[charName],
       color       = $(this).children('path').css('fill'),
-      numChapters = charData.chapterUrls.length,
-      numPov      = charData.povChapterUrls.length;
+      numChapters = _.filter(charData.chapterUrls, chapterFilter).length,
+      numPov      = _.filter(charData.povChapterUrls, chapterFilter).length;
 
     var associates  = _(pairings[arc.index])
       .map(function (numPairings, i) {

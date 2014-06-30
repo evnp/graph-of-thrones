@@ -79,7 +79,7 @@ var ChordDiagram = (function (d3, _) {
 
     /*** Update rendered arc set ***/
 
-    this.arcs = this.svg.selectAll('.arcs').data(this.chordLayout.groups);
+    this.arcs = this.svg.selectAll('.arc').data(this.chordLayout.groups);
 
     // Transition out obsolete arcs
     this.arcs.exit()
