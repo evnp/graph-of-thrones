@@ -1,10 +1,23 @@
 var ChordDiagram = (function (d3, _) {
 
+  /*** D3 Helper Functions ***/
+
+  var colorScale;
+
+  function setColor(d) {
+    var color = colorScale(d.index);
+    d3.select(this)
+      .style('stroke', d3.rgb(color).darker())
+      .style('fill', color);
+  }
+
   d3.selection.prototype.moveToFront = function() {
-    return this.each(function(){
-    this.parentNode.appendChild(this);
+    return this.each(function() {
+      this.parentNode.appendChild(this);
     });
   };
+
+  /*** Diagram Defaults ***/
 
   var defaults = {
     diameter: 800, // px
@@ -17,46 +30,48 @@ var ChordDiagram = (function (d3, _) {
     return options.hasOwnProperty(key) ? options[key] : defaults[key];
   }
 
+  /*** Diagram Constructor ***/
+
   function Diagram(container, options) {
+    options = options || {};
+
     options.diameter = valueOrDefault(options, 'diameter');
     options.arcWidth = valueOrDefault(options, 'arcWidth');
+    options.colorScale = valueOrDefault(options, 'colorScale');
+    options.transitionDuration = valueOrDefault(options, 'transitionDuration');
 
     this.outerRadius = options.diameter / 2;
-    this.innerRadius = outerRadius - options.arcWidth;
-
-    this.colorScale         = valueOrDefault(options, 'colorScale');
-    this.transitionDuration = valueOrDefault(options, 'transitionDuration');
+    this.innerRadius = this.outerRadius - options.arcWidth;
+    this.colorScale = colorScale = options.colorScale;
+    this.transitionDuration = options.transitionDuration;
 
     this.svg = d3.select(container).append('svg')
       .attr('width', this.outerRadius * 2)
       .attr('height', this.outerRadius * 2)
       .append('g')
-        .attr('transform', 'translate(' + outerRadius + ',' + outerRadius + ')');
+        .attr('transform', 'translate(' + this.outerRadius + ',' + this.outerRadius + ')');
 
     this.chordLayout = d3.layout.chord()
       .sortSubgroups(d3.descending)
       .sortChords(d3.descending);
 
     this.arc = d3.svg.arc()
-      .innerRadius(innerRadius)
-      .outerRadius(innerRadius + 20);
+      .innerRadius(this.innerRadius)
+      .outerRadius(this.innerRadius + 20);
 
     // Used to keep track of arc elements so they can be referenced via chords
     this.arcElements = [];
   }
 
-  Diagram.prototype.render = function (matrix, nameArray) {
+  Diagram.prototype.render = function (matrix, names) {
     var diagram = this;
 
-    // Set color scale domain for new data
-    this.colorScale.domain(0, nameArray.length);
+    this.names  = names;
+    this.matrix = matrix;
 
-    function setColor(d) {
-      var color = diagram.colorScale(d.index);
-      d3.select(this)
-        .style('stroke', d3.rgb(color).darker())
-        .style('fill', color);
-    }
+    // Set color scale domain for new data
+    this.colorScale.domain(0, names.length);
+
 
     // Generate new layout for given matrix
     this.chordLayout.matrix(matrix);
@@ -64,10 +79,10 @@ var ChordDiagram = (function (d3, _) {
 
     /*** Update rendered arc set ***/
 
-    var arcs = svg.selectAll('.arcs').data(this.chordLayout.groups);
+    this.arcs = this.svg.selectAll('.arcs').data(this.chordLayout.groups);
 
     // Transition out obsolete arcs
-    arcs.exit()
+    this.arcs.exit()
       .style('opacity', 1)
       .transition()
       .duration(this.transitionDuration)
@@ -75,39 +90,41 @@ var ChordDiagram = (function (d3, _) {
       .remove();
 
     // Transition in new arcs
-    var newArcs = arcs.enter().append('g')
+    var newArcs = this.arcs.enter().append('g');
+
+    newArcs
       .attr('class', 'arc')
       .style('opacity', 0)
       .transition()
-      .duration(transitionDuration)
+      .duration(this.transitionDuration)
         .style('opacity', 1);
 
     // Create new arc paths and labels
     var newArcPaths = newArcs.append('path').each(setColor);
     var newArcLabels = newArcs.append('text')
-      .text(function (d) { return nameArray[d.index]; })
-      .style('fill', function (d) { return d3.rgb(diagram.colorScale(d.index).darker(); });
+      .text(function (d) { return names[d.index]; })
+      .style('fill', function (d) { return d3.rgb(diagram.colorScale(d.index)).darker(); });
 
     // Transition arc paths into new positions
-    arcs.select('path').transition()
+    this.arcs.select('path').transition()
       .duration(this.transitionDuration)
       .attr('d', this.arc);
 
     // Transition arc labels into new positions
-    arcs.select('text').transition()
+    this.arcs.select('text').transition()
       .duration(this.transitionDuration)
       .each(function(d) { d.angle = (d.startAngle + d.endAngle) / 2; })
       .attr('dy', '.35em')
       .style('text-anchor', function(d) { return d.angle > Math.PI ? 'end' : null; })
       .attr('transform', function(d) {
         return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
-            + 'translate(' + (innerRadius + 26) + ')'
+            + 'translate(' + (diagram.innerRadius + 26) + ')'
             + (d.angle > Math.PI ? 'rotate(180)' : '');
       });
 
     // Reset arc ticks
-    arcs.selectAll('.tick').remove();
-    arcs.append("g").selectAll("g").data(function (d) {
+    this.arcs.selectAll('.tick').remove();
+    this.arcs.append("g").selectAll("g").data(function (d) {
       var k = (d.endAngle - d.startAngle) / d.value;
       return d3.range(0, d.value, 5).map(function(v, i) {
         return {
@@ -135,10 +152,10 @@ var ChordDiagram = (function (d3, _) {
 
     /*** Update rendered chord set ***/
 
-    var chords = svg.selectAll('.chord').data(this.chordLayout.chords);
+    this.chords = this.svg.selectAll('.chord').data(this.chordLayout.chords);
 
     // Transition out obsolete chords
-    chords.exit()
+    this.chords.exit()
       .style('opacity', 1)
       .transition()
       .duration(this.transitionDuration)
@@ -146,13 +163,15 @@ var ChordDiagram = (function (d3, _) {
       .remove();
 
     // Create new chords as needed
-    chords.enter().append('path')
+    var newChords = this.chords.enter().append('path');
+
+    newChords
       .attr('class', 'chord')
       .each(function(d) { setColor.call(this, d.source); })
       .style('opacity', 0);
 
     // Transition chords into new positions
-    chords.transition()
+    this.chords.transition()
       .duration(this.transitionDuration)
       .style('opacity', 1)
       .attr('d', d3.svg.chord().radius(this.innerRadius));
@@ -162,14 +181,14 @@ var ChordDiagram = (function (d3, _) {
 
     // Collect arc elements so they can be referenced via chords
     this.arcElements = [];
-    arcs.each(function (d, i) { diagram.arcElements[i] = this; });
+    this.arcs.each(function (d, i) { diagram.arcElements[i] = this; });
 
     newArcs
-      .on('mouseenter', function (arc) { diagram.highlightChordsForArc(arc); })
+      .on('mouseover', function (arc) { diagram.highlightChordsForArc(arc); })
       .on('mouseout', function () { diagram.unhighlightAll(); });
 
     newChords
-      .on('mouseenter', function (chord) { diagram.highlightChord(chord); })
+      .on('mouseover', function (chord) { diagram.highlightChord(chord); })
       .on('mouseout', function (chord) { diagram.unhighlightChord(chord); });
 
 
@@ -184,11 +203,11 @@ var ChordDiagram = (function (d3, _) {
   Diagram.prototype.highlightChordsForArc = function (arc) {
     var diagram = this;
 
-    svg.classed('fade-arcs', true);
-    svg.classed('fade-chords', true);
+    this.svg.classed('fade-arcs', true);
+    this.svg.classed('fade-chords', true);
     d3.select(this.arcElements[arc.index]).classed('highlighted', true);
 
-    chords.classed('highlighted', function (chord) {
+    this.chords.classed('highlighted', function (chord) {
       return chord.source.index === arc.index || chord.target.index === arc.index;
     }).each(function (chord) {
       if (chord.source.index === arc.index) {
@@ -223,7 +242,7 @@ var ChordDiagram = (function (d3, _) {
     d3.select(chord.element).moveToFront();
   };
 
-
+  return Diagram;
 
 })(d3, _);
 

@@ -18,7 +18,7 @@ body {
           transition: fill-opacity .4s;
 }
 
-.group path {
+.arc path {
   stroke-width: 0;
   opacity: .8;
 
@@ -28,7 +28,7 @@ body {
           transition: opacity .2s;
 }
 
-.group text {
+.arc text {
   opacity: .8;
 
   -webkit-transition: opacity .2s;
@@ -37,15 +37,15 @@ body {
           transition: opacity .2s;
 }
 
-.group .tick {
+.arc .tick {
   stroke-opacity: .3;
 }
 
 .fade-chords .chord {
   fill-opacity: .03;
 }
-.fade-groups .group path,
-.fade-groups .group text {
+.fade-arcs .arc path,
+.fade-arcs .arc text {
   opacity: .08;
 }
 
@@ -57,13 +57,13 @@ body {
   fill-opacity: .8;
 }
 
-.group:hover path,
-.group:hover text {
+.arc:hover path,
+.arc:hover text {
   stroke-width: 1;
   opacity: 1;
 }
-.fade-groups .group.highlighted path,
-.fade-groups .group.highlighted text {
+.fade-arcs .arc.highlighted path,
+.fade-arcs .arc.highlighted text {
   opacity: .8;
 }
 

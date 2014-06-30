@@ -1,7 +1,7 @@
 (function ($, _, d3) {
 
   // Initialize Diagram
-  var chordDiagram = ChordDiagram($('#chart-container').get());
+  var diagram = new ChordDiagram($('#chart-container').get(0));
 
   /*** Data Controls ***/
 
@@ -96,9 +96,10 @@
   });
 
   function rebuild() {
-    var nameArray = _.pluck(getFilteredCharacters(), 'name'),
-        matrix = generateMatrix(nameArray);
-    render(matrix, nameArray);
+    var names = _.pluck(getFilteredCharacters(), 'name'),
+        pairings = countPairings(names);
+
+    render(pairings, names);
   }
 
   function chapterFilter(chapterUrl) {
@@ -118,7 +119,7 @@
   }
 
   // Construct a square matrix containing counts of character pairings
-  function generateMatrix(characterNameList) {
+  function countPairings(characterNameList) {
     var nameToIndexMap = getKeyToIndexMap(characterNameList),
         filteredChapters =
         size = characterNameList.length,
@@ -160,75 +161,89 @@
     return matrix;
   }
 
-  function render(matrix, nameList) {
+  function render(pairings, names) {
 
-    var newSelections = chordDiagram.render(matrix, nameList),
+    var newSelections = diagram.render(pairings, names),
         newArcs   = newSelections.newArcs,
         newChords = newSelections.newChords;
 
     newArcs
       .on('mouseenter', setCharacterInfo)
-      .attr('data-character', function (d) { return nameList[d.index]; })
-      .each(function (d) { characterMap[nameList[d.index]].arc = d; })
+      .attr('data-character', function (d) { return names[d.index]; })
+      .each(function (d) { characterMap[names[d.index]].arc = d; })
+  }
 
-    /*** Character Info ***/
 
-    function setCharacterInfo(d) {
-      var $info = $('#info-container'),
-        charName    = nameList[d.index],
-        charData    = characterMap[charName],
-        color       = $(this).children('path').css('fill'),
-        numChapters = charData.chapterUrls.length,
-        numPov      = charData.povChapterUrls.length,
-        associates  = _(matrix[d.index])
-          .map(function (numPairings, index) {
-            return {
-              character: characterMap[nameList[index]],
-              numPairings: numPairings
-            };
-          })
-          .filter('numPairings')
-          .sortBy('numPairings')
-          .reverse() // order desc
-          .pluck('character')
-          .value();
+  /*** Character Info ***/
 
-      $info.find('.info').each(function () {
-        var $el = $(this),
-            key = $el.data('info-key'),
-          value = charData[key];
+  var $info = $('#info-container');
 
-        if (!value) { // If no value, don't show the element
-          $el.hide();
-        } else if ($el.hasClass('url')) { // Special case for url data
-          $el.show().attr('href', value);
-        } else if ($el.hasClass('text')) { // If el is text element, set text
-          $el.show().text(value);
-        } else { // Otherwise, see if a child is text element and set text
-          var children = $el.find('.text');
-          if (children.length) { children.text(value); }
-          $el.show();
-        }
-      });
+  function setCharacterInfo(arc) {
+    var pairings = diagram.matrix,
+        names    = diagram.names;
 
-      $info.find('a').css('color', color);
+    var charName  = names[arc.index],
+      charData    = characterMap[charName],
+      color       = $(this).children('path').css('fill'),
+      numChapters = charData.chapterUrls.length,
+      numPov      = charData.povChapterUrls.length;
 
-      $info.find('.activity').html(
-        '<h3>Activity</h3>'+
-        '<p>'+ numChapters +' chapters'+
-              (numPov ? ' ('+ numPov +' pov)' : '')
-             +', with'+
-        '</p>'+
-        '<ul>'+  _.map(associates.slice(0, 10), function (associate) {
-          return '<li><a style="color: '+ d3.rgb(associate.color).darker() +'" href="'+ associate.url +'">'+ associate.name +'</a></li>';
-        }).join('')+
-        '</ul>'+
-        (associates.length <= 10 ? '' : '<p>and '+ (associates.length - 10) + ' others</p>')
-      );
+    var associates  = _(pairings[arc.index])
+      .map(function (numPairings, i) {
+        return { name: names[i], numPairings: numPairings };
+      })
+      .filter('numPairings')
+      .sortBy('numPairings')
+      .reverse() // order desc
+      .pluck('name')
+      .value();
 
-      $info.show();
+    $info.find('.info').each(function () {
+      var $el = $(this),
+          key = $el.data('info-key'),
+        value = charData[key];
+
+      if (!value) { // If no value, don't show the element
+        $el.hide();
+      } else if ($el.hasClass('url')) { // Special case for url data
+        $el.show().attr('href', value);
+      } else if ($el.hasClass('text')) { // If el is text element, set text
+        $el.show().text(value);
+      } else { // Otherwise, see if a child is text element and set text
+        var children = $el.find('.text');
+        if (children.length) { children.text(value); }
+        $el.show();
+      }
+    });
+
+    $info.find('a').css('color', color);
+
+    $info.find('.activity').html(
+      '<h3>Activity</h3>'+
+      '<p>'+ numChapters +' chapters'+
+            (numPov ? ' ('+ numPov +' pov)' : '')
+           +', with'+
+      '</p>'+
+      '<ul>'+ _.map(associates.slice(0, 10), getCharacterListEl).join('') +'</ul>'+
+      (associates.length <= 10 ? '' : '<p>and '+ (associates.length - 10) + ' others</p>')
+    );
+
+    $info.show();
+
+    function getCharacterListEl(name) {
+      var character = characterMap[name],
+        color = d3.rgb(diagram.colorScale(names.indexOf(character.name))).darker();
+
+      if (character) {
+        return '<li>'+
+          '<a style="color: '+ color +'" href="'+ character.url +'">'+
+            character.name +
+          '</a>'+
+        '</li>';
+      } else {
+        return '<li>' + name + '</li>';
+      }
     }
-
   }
 
 
@@ -238,12 +253,13 @@
 
   $activity.off('mouseenter');
   $activity.on('mouseenter', 'li a', function () {
-    chordDiagram.highlightChordsForArc(characterMap[charName].arc);
+    var name = $(this).text();
+    diagram.highlightChordsForArc(characterMap[name].arc);
   });
 
   $activity.off('mouseout');
   $activity.on('mouseout', 'li a', function () {
-    chordDiagram.unhighlightAll();
+    diagram.unhighlightAll();
   });
 
 
