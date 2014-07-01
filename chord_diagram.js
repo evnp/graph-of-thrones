@@ -2,13 +2,11 @@ var ChordDiagram = (function (d3, _) {
 
   /*** D3 Helper Functions ***/
 
-  var colorScale;
-
-  function setColor(d) {
-    var color = colorScale(d.index);
-    d3.select(this)
-      .style('stroke', d3.rgb(color).darker())
-      .style('fill', color);
+  // Set fill and stroke (darker) color for a selection, via provided getColor function
+  d3.selection.prototype.setColor = function (getColor, noStroke) {
+    this.style('fill', function (d) { return getColor.call(this, d); });
+    !noStroke && this.style('stroke', function (d) { return d3.rgb(getColor.call(this, d)).darker(); });
+    return this;
   }
 
   d3.selection.prototype.moveToFront = function() {
@@ -42,8 +40,9 @@ var ChordDiagram = (function (d3, _) {
 
     this.outerRadius = options.diameter / 2;
     this.innerRadius = this.outerRadius - options.arcWidth;
-    this.colorScale = colorScale = options.colorScale;
+    this.colorScale  = options.colorScale;
     this.transitionDuration = options.transitionDuration;
+
 
     this.svg = d3.select(container).append('svg')
       .attr('width', this.outerRadius * 2)
@@ -72,10 +71,8 @@ var ChordDiagram = (function (d3, _) {
     // Set color scale domain for new data
     this.colorScale.domain(0, names.length);
 
-
     // Generate new layout for given matrix
     this.chordLayout.matrix(matrix);
-
 
     /*** Update rendered arc set ***/
 
@@ -96,14 +93,17 @@ var ChordDiagram = (function (d3, _) {
       .attr('class', 'arc')
       .style('opacity', 0)
       .transition()
-      .duration(this.transitionDuration)
+        .duration(this.transitionDuration)
         .style('opacity', 1);
 
     // Create new arc paths and labels
-    var newArcPaths = newArcs.append('path').each(setColor);
-    var newArcLabels = newArcs.append('text')
-      .text(function (d) { return names[d.index]; })
-      .style('fill', function (d) { return d3.rgb(diagram.colorScale(d.index)).darker(); });
+    newArcs.append('path');
+    newArcs.append('text').text(function (d) { return names[d.index]; });
+
+    // Set arc path and text colors using new color scale domain
+    function getColor(d) { return diagram.colorScale(d.index); }
+    this.arcs.selectAll('path').setColor(getColor);
+    this.arcs.selectAll('text').setColor(function (d) { return d3.rgb(getColor(d)).darker(); }, true);
 
     // Transition arc paths into new positions
     this.arcs.select('path').transition()
@@ -167,7 +167,7 @@ var ChordDiagram = (function (d3, _) {
 
     newChords
       .attr('class', 'chord')
-      .each(function(d) { setColor.call(this, d.source); })
+      .setColor(function(d) { return diagram.colorScale(d.source.index); })
       .style('opacity', 0);
 
     // Transition chords into new positions
@@ -179,7 +179,7 @@ var ChordDiagram = (function (d3, _) {
 
     /*** Chord and Arc Events  ***/
 
-    // Collect arc elements so they can be referenced via chords
+    // Collect arc and chord elements so they can be referenced via chords
     this.arcElements = [];
     this.arcs.each(function (d, i) { diagram.arcElements[i] = this; });
 
@@ -207,17 +207,21 @@ var ChordDiagram = (function (d3, _) {
     this.svg.classed('fade-chords', true);
     d3.select(this.arcElements[arc.index]).classed('highlighted', true);
 
-    this.chords.classed('highlighted', function (chord) {
-      return chord.source.index === arc.index || chord.target.index === arc.index;
-    }).each(function (chord) {
-      if (chord.source.index === arc.index) {
-        setColor.call(this, chord.target);
+    this.chords
+      .filter(function (chord) { return chord.source.index === arc.index; })
+      .classed('highlighted', true)
+      .setColor(function (chord) { return diagram.colorScale(chord.target.index); })
+      .each(function (chord) {
         d3.select(diagram.arcElements[chord.target.index]).classed('highlighted', true);
-      } else if (chord.target.index === arc.index) {
-        setColor.call(this, chord.source);
+      });
+
+    this.chords
+      .filter(function (chord) { return chord.target.index === arc.index; })
+      .classed('highlighted', true)
+      .setColor(function (chord) { return diagram.colorScale(chord.source.index); })
+      .each(function (chord) {
         d3.select(diagram.arcElements[chord.source.index]).classed('highlighted', true);
-      }
-    });
+      });
   };
 
   Diagram.prototype.unhighlightAll = function () {
@@ -245,4 +249,3 @@ var ChordDiagram = (function (d3, _) {
   return Diagram;
 
 })(d3, _);
-

@@ -1,53 +1,8 @@
 (function ($, _, d3) {
 
   // Initialize Diagram
+
   var diagram = new ChordDiagram($('#chart-container').get(0));
-
-  /*** Data Controls ***/
-
-  // var $modules = $('#modules'),
-  //     $months = $('#months'),
-  //     $years = $('#years'),
-  //     $includeSolo  = $('#include_solo');
-
-  // // Set initial states for filters
-  // $modules.attr('data-choice-type', 'module')
-  //   .children('option[value="13"], option[value="14"], option[value="15"]')
-  //   .prop('selected', true);
-  // $months.attr('data-choice-type', 'month');
-  // $years.attr('data-choice-type', 'year')
-  //   .children('option[value="2014"]').prop('selected', true);
-
-  // // Control value getter functions
-  // function getModulesVal() { return ($modules.val() || []).map(parseFloat); }
-  // function getMonthsVal() { return ($months.val() || []).map(function (month) { return parseFloat(month) + 1; }); }
-  // function getYearsVal() { return ($years.val() || []).map(function (month) { return parseFloat(month) % 100; }); }
-  // function getIncludeSoloVal() { return $includeSolo.prop('checked'); }
-
-  // // Variables representing the current state of filters
-  // var modules     = getModulesVal(),
-  //     months      = getMonthsVal(),
-  //     years       = getYearsVal(),
-  //     includeSolo = getIncludeSoloVal();
-
-  // // When control changes, update corresponding filter state and rebuild graph
-  // $modules.change(function () {
-  //   modules = getModulesVal();
-  //   rebuild();
-  // });
-  // $months.change(function () {
-  //   months = getMonthsVal();
-  //   rebuild();
-  // })
-  // $years.change(function () {
-  //   years = getYearsVal();
-  //   rebuild();
-  // })
-  // $includeSolo.change(function () {
-  //   includeSolo = getIncludeSoloVal();
-  //   rebuild();
-  // });
-
 
   var includeAppearances = true,
       includeActive = true,
@@ -60,7 +15,6 @@
     $controls = $('#controls-container'),
     $booksControl = $controls.children('.books'),
     $appearancesControl = $controls.find('.min-appearances');
-
 
   // Set up books control
 
@@ -87,7 +41,6 @@
 
     rebuild();
   });
-
 
   // Set up min-appearances control
 
