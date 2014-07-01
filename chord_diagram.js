@@ -207,19 +207,19 @@ var ChordDiagram = (function (d3, _) {
     this.svg.classed('fade-chords', true);
     d3.select(this.arcElements[arc.index]).classed('highlighted', true);
 
-    this.chords
+    this.chords // for each chord with source == arc
       .filter(function (chord) { return chord.source.index === arc.index; })
-      .classed('highlighted', true)
       .setColor(function (chord) { return diagram.colorScale(chord.target.index); })
-      .each(function (chord) {
+      .classed('highlighted', true)
+      .each(function (chord) { // highlight target arcs
         d3.select(diagram.arcElements[chord.target.index]).classed('highlighted', true);
       });
 
-    this.chords
+    this.chords // for each chord with target == arc
       .filter(function (chord) { return chord.target.index === arc.index; })
-      .classed('highlighted', true)
       .setColor(function (chord) { return diagram.colorScale(chord.source.index); })
-      .each(function (chord) {
+      .classed('highlighted', true)
+      .each(function (chord) { // highlight source arcs
         d3.select(diagram.arcElements[chord.source.index]).classed('highlighted', true);
       });
   };
