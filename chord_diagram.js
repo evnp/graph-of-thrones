@@ -98,12 +98,14 @@ var ChordDiagram = (function (d3, _) {
 
     // Create new arc paths and labels
     newArcs.append('path');
-    newArcs.append('text').text(function (d) { return names[d.index]; });
+    newArcs.append('text');
 
     // Set arc path and text colors using new color scale domain
     function getColor(d) { return diagram.colorScale(d.index); }
     this.arcs.selectAll('path').setColor(getColor);
-    this.arcs.selectAll('text').setColor(function (d) { return d3.rgb(getColor(d)).darker(); }, true);
+    this.arcs.selectAll('text')
+      .setColor(function (d) { return d3.rgb(getColor(d)).darker(); }, true)
+      .text(function (d) { return names[d.index]; });
 
     // Transition arc paths into new positions
     this.arcs.select('path').transition()
@@ -167,7 +169,7 @@ var ChordDiagram = (function (d3, _) {
 
     newChords
       .attr('class', 'chord')
-      .setColor(function(d) { return diagram.colorScale(d.source.index); })
+      .setColor(function (d) { return diagram.colorScale(d.source.index); })
       .style('opacity', 0);
 
     // Transition chords into new positions
@@ -182,13 +184,14 @@ var ChordDiagram = (function (d3, _) {
     // Collect arc and chord elements so they can be referenced via chords
     this.arcElements = [];
     this.arcs.each(function (d, i) { diagram.arcElements[i] = this; });
+    this.chords.each(function (d) { d.element = this; });
 
     newArcs
       .on('mouseover', function (arc) { diagram.highlightChordsForArc(arc); })
       .on('mouseout', function () { diagram.unhighlightAll(); });
 
     newChords
-      .on('mouseover', function (chord) { diagram.highlightChord(chord); })
+      .on('mouseenter', function (chord) { diagram.highlightChord(chord); })
       .on('mouseout', function (chord) { diagram.unhighlightChord(chord); });
 
 
@@ -239,11 +242,33 @@ var ChordDiagram = (function (d3, _) {
     this.toggleChordHighlight(chord, false);
   };
 
+  var currentChord = currentSource = currentTarget = null;
   Diagram.prototype.toggleChordHighlight = function (chord, toggle) {
-    this.svg.classed('fade-arcs', toggle);
-    d3.select(this.arcElements[chord.source.index]).classed('highlighted', toggle);
-    d3.select(this.arcElements[chord.target.index]).classed('highlighted', toggle);
+    var source = this.arcElements[chord.source.index],
+        target = this.arcElements[chord.target.index];
+
+    // Only unhighlight (toggle == false) if currentChord hasn't changed
+    if (toggle || chord === currentChord) {
+      this.svg.classed('fade-arcs', toggle);
+    }
+
+    // For source/target
+    // - only unhighlight if currentChord hasn't changed
+    // - only highlght if source/target HAS changed
+
+    if (toggle) {
+      this.arcs.classed('highlighted', false);
+    }
+
+    d3.select(source).classed('highlighted', toggle);
+    d3.select(target).classed('highlighted', toggle);
+
+    console.log(chord.element);
     d3.select(chord.element).moveToFront();
+
+    currentChord = chord;
+    currentSource = source;
+    currentTarget = target;
   };
 
   return Diagram;
